@@ -63,7 +63,7 @@ Parameters:
   CfnTemplateBaseUrl:
     Type: String
     Description: The base URL for finding nested stack templates.
-    Default: "https://windows-dev-env-ec2.s3.us-west-2.amazonaws.com/cfn/"
+    Default: "https://raw.githubusercontent.com/tuanmh/windows-dev-env-ec2/main/cfn/"
 
   UseDefaultVPC:
     Type: String
