@@ -1,0 +1,421 @@
+# This template is designed to create a new VPC for resources to be deployed.
+# The new VPC will have public / private subnets with a NAT gateway configure.
+
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "Template to create a custom VPC, Subnets, etc."
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Tag name for resources created.
+        Parameters:
+          - WorkshopNameTagValue
+      - Label:
+          default: Infrequently changed metadata that users likely won't have to change
+        Parameters:
+          - VPCName
+          - VPCCIDRBlock
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PublicSubnet3CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+          - PrivateSubnet3CIDR
+          - SubnetsExportNamePrefix
+          - SubnetsPrivateExportNamePrefix
+          - VpcIdExportNamePrefix
+
+Parameters:
+  WorkshopNameTagValue: # Also, this will be the name of the EC2 instance and multiple ofhter AWS resources.
+    Type: String
+    Description: Name tag value for resources created by this stack, including EC2 instance name
+    Default: "Workshop - .NET development on AWS"
+
+  VPCCIDRBlock:
+    Type: String
+    Description: VPC CIDR Block
+    Default: "10.0.0.0/16"
+
+  PublicSubnet1CIDR:
+    Type: String
+    Description: Public Subnet 1 CIDR Block
+    Default: "10.0.1.0/24"
+
+  PublicSubnet2CIDR:
+    Type: String
+    Description: Public Subnet 2 CIDR Block
+    Default: "10.0.2.0/24"
+
+  PublicSubnet3CIDR:
+    Type: String
+    Description: Public Subnet 3 CIDR Block
+    Default: "10.0.3.0/24"
+
+  PrivateSubnet1CIDR:
+    Type: String
+    Description: Private Subnet 1 CIDR Block
+    Default: "10.0.11.0/24"
+
+  PrivateSubnet2CIDR:
+    Type: String
+    Description: Private Subnet 2 CIDR Block
+    Default: "10.0.12.0/24"
+
+  PrivateSubnet3CIDR:
+    Type: String
+    Description: Private Subnet 3 CIDR Block
+    Default: "10.0.13.0/24"
+
+  SubnetsExportNamePrefix:
+    Type: String
+    Description: The prefix for the Subnets Export Variable
+    Default: ""
+
+  SubnetsPrivateExportNamePrefix:
+    Type: String
+    Description: The prefix for the Private Subnets Export Variable
+    Default: ""
+
+  VpcIdExportNamePrefix:
+    Type: String
+    Description: The prefix value for the VpcId Export Variable
+    Default: ""
+
+# For enabling this dev environment in other regions, please contact @vladhry
+Mappings:
+  RegionMap:
+    ap-southeast-1: # Asia Pacific (Singapore)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    sa-east-1: # South America (Sao Paulo)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    ap-northeast-3: # Asia Pacific (Osaka-Local)
+      AZ1Index: 0
+      AZ2Index: 0
+      AZ3Index: 0
+    ap-northeast-1: # Asia Pacific (Tokyo)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    eu-west-2: # EU West (London)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    eu-west-3: # EU West (Paris)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    us-east-2: # US East (Ohio)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    ca-central-1: # Canada (Central)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    ap-northeast-2: # Asia Pacific (Seoul)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    me-south-1: # Middle East (Bahrain)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    eu-central-1: # EU Central (Frankfurt)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    eu-west-1: # EU West (Ireland)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    eu-north-1: # EU North (Stockholm)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    ap-southeast-2: # Asia Pacific (Sydney)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    us-west-2: # US West (Oregon)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    us-west-1: # US West (N. California)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 1
+    ap-south-1: # Asia Pacific (Mumbai)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+    us-east-1: # US East (Virginia)
+      AZ1Index: 0
+      AZ2Index: 1
+      AZ3Index: 2
+
+Resources:
+  CustomVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDRBlock
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: default
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Ref WorkshopNameTagValue
+
+  CustomVPCIGW:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Ref WorkshopNameTagValue
+
+  IGWRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: CustomVPCIGW
+
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: CustomVPC
+      InternetGatewayId:
+        Ref: CustomVPCIGW
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: CustomVPC
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Private"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: CustomVPC
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Public"
+
+  DefaultNATGW:
+    DependsOn: AttachIGW
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - DefaultNATGWNATGWEIP
+          - AllocationId
+      SubnetId:
+        Ref: PublicSubnet1
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Ref WorkshopNameTagValue
+
+  DefaultNATGWNATGWEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  NATGWRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: DefaultNATGW
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref CustomVPC
+      MapPublicIpOnLaunch: true
+      CidrBlock: !Ref PublicSubnet1CIDR
+      AvailabilityZone: !Select
+        - !FindInMap [RegionMap, !Ref "AWS::Region", AZ1Index]
+        - Fn::GetAZs: !Ref "AWS::Region"
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Pub1"
+
+  PublicSubnet1RouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PublicSubnet1
+      RouteTableId:
+        Ref: PublicRouteTable
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref CustomVPC
+      MapPublicIpOnLaunch: true
+      CidrBlock: !Ref PublicSubnet2CIDR
+      AvailabilityZone: !Select
+        - !FindInMap [RegionMap, !Ref "AWS::Region", AZ2Index]
+        - Fn::GetAZs: !Ref "AWS::Region"
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Pub2"
+
+  PublicSubnet2RouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PublicSubnet2
+      RouteTableId:
+        Ref: PublicRouteTable
+
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref CustomVPC
+      MapPublicIpOnLaunch: true
+      CidrBlock: !Ref PublicSubnet3CIDR
+      AvailabilityZone: !Select
+        - !FindInMap [RegionMap, !Ref "AWS::Region", AZ3Index]
+        - Fn::GetAZs: !Ref "AWS::Region"
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Pub3"
+
+  PublicSubnet3RouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PublicSubnet3
+      RouteTableId:
+        Ref: PublicRouteTable
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: CustomVPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select
+        - !FindInMap [RegionMap, !Ref "AWS::Region", AZ1Index]
+        - Fn::GetAZs: !Ref "AWS::Region"
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Priv1"
+
+  PrivateSubnet1RouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet1
+      RouteTableId:
+        Ref: PrivateRouteTable
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: CustomVPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select
+        - !FindInMap [RegionMap, !Ref "AWS::Region", AZ2Index]
+        - Fn::GetAZs: !Ref "AWS::Region"
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Priv2"
+
+  PrivateSubnet2RouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet2
+      RouteTableId:
+        Ref: PrivateRouteTable
+
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: CustomVPC
+      CidrBlock: !Ref PrivateSubnet3CIDR
+      AvailabilityZone: !Select
+        - !FindInMap [RegionMap, !Ref "AWS::Region", AZ3Index]
+        - Fn::GetAZs: !Ref "AWS::Region"
+      Tags:
+        - Key: WorkshopId
+          Value: !Ref WorkshopNameTagValue
+        - Key: Name
+          Value: !Sub "${WorkshopNameTagValue}-Priv3"
+
+  PrivateSubnet3RouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet3
+      RouteTableId:
+        Ref: PrivateRouteTable
+
+Outputs:
+  VpcId:
+    Value: !Ref CustomVPC
+    Description: "The custom VPC Id"
+    Export:
+      Name: !Join ["", [!Ref VpcIdExportNamePrefix, "VpcId"]]
+
+  Subnets:
+    Value:
+      !Join [",", [!Ref PublicSubnet1, !Ref PublicSubnet2, !Ref PublicSubnet3]]
+    Description: "The new public subnets"
+    Export:
+      Name: !Join ["", [!Ref SubnetsExportNamePrefix, "Subnets"]]
+
+  SubnetsPrivate:
+    Value:
+      !Join [
+        ",",
+        [!Ref PrivateSubnet1, !Ref PrivateSubnet2, !Ref PrivateSubnet3],
+      ]
+    Description: "The new private subnets"
+    Export:
+      Name: !Join ["", [!Ref SubnetsPrivateExportNamePrefix, "SubnetsPrivate"]]
+
+  VpcCidr:
+    Value: !Ref VPCCIDRBlock
+    Description: "The VPC Cidr block"
+    Export:
+      Name: !Join ["", [!Ref VpcIdExportNamePrefix, "CDIR"]]
